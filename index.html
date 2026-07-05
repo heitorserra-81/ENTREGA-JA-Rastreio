@@ -1,1 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0"/>
+<title>Rastreio – Entrega Já</title>
+<meta name="theme-color" content="#0f1a2e"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#080f1e;--card:#0f1a2e;--card2:#1a2540;--border:rgba(251,191,36,0.2);
+  --dourado:#fbbf24;--dourado2:#f59e0b;--muted:#7a8fa8;--text:#f0e6c8;--verde:#22c55e;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
+@keyframes gira{from{transform:translate(-50%,-50%) rotate(0deg);}to{transform:translate(-50%,-50%) rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-7px);}}
+@keyframes slideUp{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
 
+.header{padding:calc(var(--sat) + 16px) 18px 14px;background:linear-gradient(180deg,rgba(26,42,74,0.97),rgba(15,26,46,0.85));border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:relative;z-index:500;}
+.header img{width:46px;height:46px;border-radius:13px;object-fit:cover;box-shadow:0 4px 14px rgba(251,191,36,0.4);}
+.header-tit{font-size:15px;font-weight:900;color:#fff;}
+.header-sub{font-size:11px;color:var(--muted);}
+
+#mapa{height:44vh;width:100%;background:#060d18;}
+
+.painel{background:var(--card);border-radius:24px 24px 0 0;margin-top:-22px;position:relative;z-index:400;padding:18px 18px calc(var(--sab) + 26px);box-shadow:0 -8px 30px rgba(0,0,0,0.5);animation:slideUp 0.5s ease;}
+.punho{width:40px;height:4px;background:var(--border);border-radius:3px;margin:0 auto 16px;}
+
+.status-hero{text-align:center;margin-bottom:18px;}
+.status-emoji{font-size:44px;animation:float 3s ease-in-out infinite;display:inline-block;}
+.status-txt{font-size:19px;font-weight:900;color:#fff;margin-top:6px;}
+.status-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+
+.timeline{display:flex;justify-content:space-between;margin:0 6px 20px;position:relative;}
+.timeline::before{content:"";position:absolute;top:14px;left:26px;right:26px;height:3px;background:var(--card2);border-radius:2px;z-index:0;}
+.tl-fill{position:absolute;top:14px;left:26px;height:3px;background:linear-gradient(90deg,var(--dourado2),var(--dourado));border-radius:2px;z-index:1;transition:width 0.8s ease;}
+.tl-etapa{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:2;width:56px;}
+.tl-bola{width:30px;height:30px;border-radius:50%;background:var(--card2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;transition:all 0.4s ease;}
+.tl-etapa.feita .tl-bola{background:var(--dourado);border-color:var(--dourado);box-shadow:0 0 14px rgba(251,191,36,0.5);}
+.tl-etapa.atual .tl-bola{background:var(--dourado);border-color:#fff;box-shadow:0 0 18px rgba(251,191,36,0.8);animation:pulse 1.6s infinite;}
+.tl-lb{font-size:9px;font-weight:700;color:var(--muted);text-align:center;line-height:1.2;}
+.tl-etapa.feita .tl-lb,.tl-etapa.atual .tl-lb{color:var(--dourado);}
+
+.card-info{background:var(--card2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:11px;display:flex;align-items:center;gap:12px;}
+.mot-foto{width:48px;height:48px;border-radius:50%;background:var(--bg);border:2px solid var(--dourado);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;}
+.mot-foto img{width:100%;height:100%;object-fit:cover;}
+.ci-nome{font-size:14px;font-weight:800;color:#fff;}
+.ci-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+.dest-row{background:var(--card2);border:1px solid var(--border);border-radius:16px;padding:13px 14px;margin-bottom:11px;font-size:12px;color:var(--text);line-height:1.5;}
+
+.dev-retangulo{position:relative;display:inline-block;border-radius:13px;padding:2px;overflow:hidden;margin-top:14px;}
+.dev-luz{position:absolute;top:50%;left:50%;width:200%;height:200%;background:conic-gradient(#ef4444,#3b82f6,#fbbf24,#22c55e,#ef4444);animation:gira 2s linear infinite;}
+.dev-inner{position:relative;z-index:1;background:var(--card);border-radius:11px;padding:7px 20px;text-align:center;}
+.dev-por{font-size:10px;color:var(--muted);}
+.dev-nome{font-size:12px;font-weight:800;color:var(--dourado);white-space:nowrap;}
+.rodape{text-align:center;}
+
+.tela-cheia{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;}
+.tc-emoji{font-size:64px;animation:float 3s ease-in-out infinite;}
+.tc-tit{font-size:22px;font-weight:900;color:#fff;}
+.tc-sub{font-size:13px;color:var(--muted);max-width:280px;line-height:1.5;}
+.spinner{width:38px;height:38px;border:3px solid var(--card2);border-top-color:var(--dourado);border-radius:50%;animation:spin 0.9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div id="tela-loading" class="tela-cheia">
+  <div class="spinner"></div>
+  <div class="tc-sub">Carregando sua entrega...</div>
+</div>
+
+<div id="tela-erro" class="tela-cheia" style="display:none;">
+  <div class="tc-emoji">🔍</div>
+  <div class="tc-tit">Entrega não encontrada</div>
+  <div class="tc-sub">Este link de rastreio não é válido ou a entrega não existe mais. Confirme com o restaurante.</div>
+  <div class="dev-retangulo"><div class="dev-luz"></div><div class="dev-inner"><div class="dev-por">Desenvolvido por</div><div class="dev-nome">Heitor Serra Neto</div></div></div>
+</div>
+
+<div id="tela-rastreio" style="display:none;">
+  <div class="header">
+    <img src="https://raw.githubusercontent.com/heitorserra-81/ENTREGA-JA-Restaurante/refs/heads/main/IMG_1104.png" alt="Entrega Já"/>
+    <div style="flex:1;">
+      <div class="header-tit" id="hdr-rest">Entrega Já</div>
+      <div class="header-sub">Acompanhe sua entrega em tempo real</div>
+    </div>
+  </div>
+  <div id="mapa"></div>
+  <div class="painel">
+    <div class="punho"></div>
+    <div class="status-hero">
+      <span class="status-emoji" id="st-emoji">🍳</span>
+      <div class="status-txt" id="st-txt">Preparando seu pedido</div>
+      <div class="status-sub" id="st-sub">Aguardando motoboy</div>
+    </div>
+    <div class="timeline">
+      <div class="tl-fill" id="tl-fill" style="width:0;"></div>
+      <div class="tl-etapa" id="et-0"><div class="tl-bola">🍳</div><div class="tl-lb">Pedido<br/>recebido</div></div>
+      <div class="tl-etapa" id="et-1"><div class="tl-bola">🏍️</div><div class="tl-lb">Motoboy<br/>a caminho</div></div>
+      <div class="tl-etapa" id="et-2"><div class="tl-bola">📦</div><div class="tl-lb">Pedido<br/>coletado</div></div>
+      <div class="tl-etapa" id="et-3"><div class="tl-bola">🏁</div><div class="tl-lb">Entregue!</div></div>
+    </div>
+    <div class="card-info" id="card-mot" style="display:none;">
+      <div class="mot-foto" id="mot-foto">🏍️</div>
+      <div style="flex:1;">
+        <div class="ci-nome" id="mot-nome">--</div>
+        <div class="ci-sub" id="mot-sub">Seu entregador</div>
+      </div>
+    </div>
+    <div class="dest-row" id="dest-row">📍 <span id="dest-txt">--</span></div>
+    <div class="rodape">
+      <div class="dev-retangulo"><div class="dev-luz"></div><div class="dev-inner"><div class="dev-por">Desenvolvido por</div><div class="dev-nome">Heitor Serra Neto</div></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyAts9fsoZ_GrF3MRHDRlAw61Xti2uBkdnM",authDomain:"staffcheck-d6f20.firebaseapp.com",projectId:"staffcheck-d6f20",storageBucket:"staffcheck-d6f20.firebasestorage.app",messagingSenderId:"1055570421019",appId:"1:1055570421019:web:7b5dcc564bfe1c30189fbe"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+const params=new URLSearchParams(location.search);
+const pedidoId=params.get("p");
+
+let mapa=null,marcMot=null,marcDest=null;
+
+function g(id){return document.getElementById(id);}
+function mostrar(tela){
+  ["tela-loading","tela-erro","tela-rastreio"].forEach(t=>g(t).style.display=t===tela?(t==="tela-rastreio"?"block":"flex"):"none");
+}
+
+// Etapas: 0=aguardando 1=aceita(motoboy a caminho do restaurante) 2=coletado(a caminho do cliente) 3=concluida
+function etapaDoPedido(d){
+  if(d.status==="concluida")return 3;
+  if(d.statusEtapa==="no_carro"||d.status==="a_caminho")return 2;
+  if(d.status==="aceita"||d.status==="motoboy_chegou")return 1;
+  return 0;
+}
+const ETAPAS_UI=[
+  {emoji:"🍳",txt:"Pedido recebido!",sub:"O restaurante está procurando um motoboy"},
+  {emoji:"🏍️",txt:"Motoboy a caminho do restaurante",sub:"Seu pedido está sendo preparado"},
+  {emoji:"📦",txt:"Seu pedido está a caminho!",sub:"Acompanhe o motoboy no mapa acima"},
+  {emoji:"🎉",txt:"Pedido entregue!",sub:"Bom apetite! Obrigado pela preferência"}
+];
+
+function atualizarUI(d){
+  g("hdr-rest").textContent=d.clienteNome||"Entrega Já";
+  g("dest-txt").textContent=d.destino||"--";
+
+  if((d.status||"").startsWith("cancelada")){
+    g("st-emoji").textContent="❌";
+    g("st-txt").textContent="Entrega cancelada";
+    g("st-sub").textContent="Entre em contato com o restaurante para mais informações.";
+    g("tl-fill").style.width="0";
+    return;
+  }
+
+  const etapa=etapaDoPedido(d);
+  const ui=ETAPAS_UI[etapa];
+  g("st-emoji").textContent=ui.emoji;
+  g("st-txt").textContent=ui.txt;
+  g("st-sub").textContent=ui.sub;
+
+  for(let i=0;i<4;i++){
+    const el=g("et-"+i);
+    el.classList.remove("feita","atual");
+    if(i<etapa)el.classList.add("feita");
+    else if(i===etapa)el.classList.add("atual");
+  }
+  g("tl-fill").style.width=(etapa/3*100*0.86)+"%";
+
+  if(d.motoboy){
+    g("card-mot").style.display="flex";
+    g("mot-nome").textContent=d.motoboy.nome||"Motoboy";
+    const v={moto:"🏍️ Moto",carro:"🚗 Carro",van:"🚐 Van"};
+    g("mot-sub").textContent=(v[d.motoboy.veiculo]||"Seu entregador")+(d.motoboy.placa?" · "+d.motoboy.placa:"");
+    if(d.motoboy.foto)g("mot-foto").innerHTML=`<img src="${d.motoboy.foto}"/>`;
+  }
+
+  // Mapa: posição ao vivo do motoboy + destino
+  if(!mapa){
+    mapa=L.map("mapa",{zoomControl:true,attributionControl:false});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18}).addTo(mapa);
+    const centro=(d.motoboy&&d.motoboy.lat)?[d.motoboy.lat,d.motoboy.lng]:(d.destinoLat?[d.destinoLat,d.destinoLng]:[-22.655,-47.059]);
+    mapa.setView(centro,14);
+    setTimeout(()=>mapa.invalidateSize(),300);
+  }
+  if(d.destinoLat&&d.destinoLng&&!marcDest){
+    const svgCasa=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 42" width="34" height="42"><circle cx="17" cy="9" r="8" fill="#22c55e" stroke="#fff" stroke-width="2"/><path d="M3 40 Q3 25 17 23 Q31 25 31 40Z" fill="#22c55e" stroke="#fff" stroke-width="2"/></svg>`;
+    marcDest=L.marker([d.destinoLat,d.destinoLng],{icon:L.divIcon({html:`<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));">${svgCasa}</div>`,className:"",iconSize:[34,42],iconAnchor:[17,40]})}).addTo(mapa);
+  }
+  if(d.motoboy&&d.motoboy.lat&&etapa<3){
+    const pos=[d.motoboy.lat,d.motoboy.lng];
+    const svgMoto=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 30" width="34" height="32"><circle cx="6" cy="23" r="5" fill="#080f1e" stroke="#fbbf24" stroke-width="1.5"/><circle cx="26" cy="23" r="5" fill="#080f1e" stroke="#fbbf24" stroke-width="1.5"/><path d="M6 23 L13 13 L20 13 L26 23" stroke="#fbbf24" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 13 L16 6 L20 6" stroke="#fbbf24" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="20" cy="6" r="2.2" fill="#fbbf24"/><rect x="9" y="16" width="7" height="4" rx="1.5" fill="#f59e0b"/></svg>`;
+    const ic=L.divIcon({html:`<div style="filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));">${svgMoto}</div>`,className:"",iconSize:[34,32],iconAnchor:[17,26]});
+    if(!marcMot)marcMot=L.marker(pos,{icon:ic}).addTo(mapa);
+    else marcMot.setLatLng(pos);
+    if(marcDest){
+      mapa.fitBounds(L.latLngBounds([pos,marcDest.getLatLng()]),{padding:[46,46]});
+    }else{
+      mapa.panTo(pos,{animate:true});
+    }
+  }
+}
+
+if(!pedidoId){
+  mostrar("tela-erro");
+}else{
+  db.collection("ej_pedidos").doc(pedidoId).onSnapshot(snap=>{
+    if(!snap.exists){mostrar("tela-erro");return;}
+    mostrar("tela-rastreio");
+    atualizarUI(snap.data());
+  },()=>mostrar("tela-erro"));
+}
+</script>
+</body>
+</html>
